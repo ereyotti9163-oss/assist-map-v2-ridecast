@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>アシストマジック v2 - Ride Cast</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <div class="search-container">
+        <input type="text" id="search-input" placeholder="検索...">
+        <button id="search-button">🔍</button>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="wind-info">
+        <div class="wind-title">現在の風況 (八幡市)</div>
+        <div id="wind-data">取得中...</div>
+    </div>
+
+    <div class="controls">
+        <div id="follow-btn" class="btn">🎯</div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

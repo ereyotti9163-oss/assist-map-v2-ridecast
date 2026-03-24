@@ -1,0 +1,31 @@
+body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #fff; font-family: sans-serif; }
+#map { height: 100%; width: 100%; z-index: 1; }
+
+/* 検索ボックス */
+.search-container {
+    position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+    z-index: 1000; display: flex; gap: 2px; background: rgba(255, 255, 255, 0.9);
+    padding: 4px; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    border: 1px solid #FFD700; width: 200px;
+}
+#search-input { flex-grow: 1; padding: 4px 10px; border-radius: 15px; border: none; font-size: 14px; outline: none; width: 100%; }
+#search-button { background: none; border: none; font-size: 18px; cursor: pointer; padding-right: 8px; }
+
+/* 風情報パネル (右上に配置) */
+#wind-info {
+    position: absolute; top: 70px; right: 10px; z-index: 1000;
+    background: rgba(34, 34, 34, 0.85); color: #FFD700;
+    padding: 8px 12px; border-radius: 10px; border: 1px solid #FFD700;
+    font-size: 13px; text-align: center;
+}
+.wind-title { font-size: 10px; margin-bottom: 2px; color: #fff; }
+
+/* 現在地追従ボタン */
+.controls { position: absolute; bottom: 40px; right: 20px; z-index: 1000; }
+.btn { 
+    width: 60px; height: 60px; border-radius: 50%; background: #222; 
+    border: 3px solid #FFD700; display: flex; align-items: center; 
+    justify-content: center; box-shadow: 0 6px 15px rgba(0,0,0,0.4); cursor: pointer;
+    font-size: 28px;
+}
+.btn.active { background: #FFD700; }
