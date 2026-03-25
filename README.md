@@ -1,5 +1,5 @@
 ​主な機能
-<img width="720" height="1560" alt="image" src="https://github.com/user-attachments/assets/257537b3-e11c-478d-93a8-a48327c3af7a" />
+<img width="300" height="1560" alt="image" src="https://github.com/user-attachments/assets/257537b3-e11c-478d-93a8-a48327c3af7a" />
 
 ​リアルタイム風速・風向表示: OpenWeatherMap API（または使用中のAPI名）と連携し、現在地の詳細な風情報を取得。
 ​サイクリングロード特化マップ: サイクリストが走りやすいルートを優先的に確認可能。
