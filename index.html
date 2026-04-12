@@ -4,20 +4,62 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>アシストマジック v2 - Ride Cast</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        /* デザイン設定 */
+        body { margin: 0; padding: 0; font-family: -apple-system, sans-serif; overflow: hidden; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 0; }
+
+        /* 検索バー */
+        .search-container {
+            position: absolute; top: 10px; left: 10px; right: 10px;
+            z-index: 1000; display: flex; gap: 5px;
+        }
+        #search-input {
+            flex-grow: 1; padding: 12px; border: none; border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3); outline: none; font-size: 16px;
+        }
+        #search-button {
+            padding: 10px 15px; background: white; border: none;
+            border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: pointer;
+        }
+
+        /* 風況情報パネル */
+        #wind-info {
+            position: absolute; top: 70px; left: 10px;
+            z-index: 1000; background: rgba(255, 255, 255, 0.9);
+            padding: 10px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            min-width: 140px; pointer-events: none;
+        }
+        .wind-title { font-size: 11px; color: #666; margin-bottom: 2px; font-weight: bold; }
+        #wind-data { font-size: 14px; line-height: 1.4; color: #333; }
+
+        /* 右下のコントロール */
+        .controls {
+            position: absolute; bottom: 30px; right: 20px; z-index: 1000;
+        }
+        .btn {
+            width: 55px; height: 55px; background: white; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            cursor: pointer; transition: background 0.3s, transform 0.1s;
+        }
+        .btn:active { transform: scale(0.9); }
+        .btn.active { background: #007AFF; color: white; }
+    </style>
 </head>
 <body>
+
     <div class="search-container">
-        <input type="text" id="search-input" placeholder="検索...">
+        <input type="text" id="search-input" placeholder="場所を検索...">
         <button id="search-button">🔍</button>
     </div>
 
     <div id="map"></div>
 
     <div id="wind-info">
-        <div class="wind-title">現在の風況 (八幡市)</div>
+        <div class="wind-title">風況: <span id="location-name">読み込み中</span></div>
         <div id="wind-data">取得中...</div>
     </div>
 
@@ -26,6 +68,113 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="script.js"></script>
+    
+    <script>
+        // --- 設定・初期化 ---
+        const initialCoords = [34.882, 135.698]; // 八幡市
+        const map = L.map('map', { center: initialCoords, zoom: 16, zoomControl: false });
+
+        L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
+            maxZoom: 20, attribution: '© CyclOSM'
+        }).addTo(map);
+
+        let userMarker, isFollowing = false;
+        let currentLat = initialCoords[0], currentLon = initialCoords[1];
+
+        // --- 風データ取得ロジック ---
+        async function fetchWindData(lat, lon, label = "指定地点") {
+            try {
+                document.getElementById('location-name').innerText = label;
+                const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&timezone=Asia%2FTokyo`);
+                const data = await response.json();
+                
+                const speed = data.current.wind_speed_10m;
+                const deg = data.current.wind_direction_10m;
+                
+                const arrows = ['↓北', '↙北東', '←東', '↖南東', '↑南', '↗南西', '→西', '↘北西'];
+                const arrow = arrows[Math.round(deg / 45) % 8];
+                
+                document.getElementById('wind-data').innerHTML = `風速: <strong>${speed}m/s</strong><br>風向き: <strong>${arrow}</strong>`;
+            } catch (e) {
+                document.getElementById('wind-data').innerText = "データ取得失敗";
+            }
+        }
+
+        // --- 位置情報ハンドリング ---
+        map.on('locationfound', (e) => {
+            currentLat = e.latlng.lat;
+            currentLon = e.latlng.lng;
+            
+            if (!userMarker) {
+                userMarker = L.circleMarker(e.latlng, { radius: 9, color: '#FFFFFF', weight: 3, fillOpacity: 1, fillColor: '#007AFF' }).addTo(map);
+                fetchWindData(currentLat, currentLon, "現在地");
+            } else {
+                userMarker.setLatLng(e.latlng);
+            }
+            
+            if (isFollowing) {
+                map.setView(e.latlng, 17);
+                fetchWindData(currentLat, currentLon, "現在地");
+            }
+        });
+
+        map.locate({ watch: true, enableHighAccuracy: true });
+
+        // --- 追従ボタン動作 ---
+        const followBtn = document.getElementById('follow-btn');
+        followBtn.onclick = () => {
+            isFollowing = !isFollowing;
+            followBtn.classList.toggle('active', isFollowing);
+            if (isFollowing && userMarker) {
+                map.setView(userMarker.getLatLng(), 17);
+                fetchWindData(currentLat, currentLon, "現在地");
+            }
+        };
+
+        map.on('dragstart', () => {
+            isFollowing = false;
+            followBtn.classList.remove('active');
+        });
+
+        // --- 検索機能 ---
+        window.handleSearchResponse = function(data) {
+            if (data && data.length > 0) {
+                isFollowing = false;
+                followBtn.classList.remove('active');
+                const lat = parseFloat(data[0].lat);
+                const lon = parseFloat(data[0].lon);
+                map.setView([lat, lon], 15);
+                L.marker([lat, lon]).addTo(map).bindPopup(data[0].display_name).openPopup();
+                fetchWindData(lat, lon, "検索地点");
+            } else {
+                alert("場所が見つかりませんでした。");
+            }
+        };
+
+        function performSearch() {
+            const query = document.getElementById('search-input').value.trim();
+            if (!query) return;
+            const script = document.createElement('script');
+            script.src = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&json_callback=handleSearchResponse`;
+            document.body.appendChild(script);
+        }
+
+        document.getElementById('search-button').onclick = performSearch;
+        document.getElementById('search-input').onkeypress = (e) => { if (e.key === 'Enter') performSearch(); };
+
+        // --- 起動処理 ---
+        fetchWindData(currentLat, currentLon, "八幡市");
+
+        // 10分ごとの自動更新
+        setInterval(() => {
+            const label = isFollowing ? "現在地" : document.getElementById('location-name').innerText;
+            fetchWindData(currentLat, currentLon, label);
+        }, 600000);
+
+        // --- サービスワーカー登録 (PWA用) ---
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').catch(err => console.log("SW登録失敗:", err));
+        }
+    </script>
 </body>
 </html>
