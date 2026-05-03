@@ -15,36 +15,30 @@
         .wind-title { font-size: 11px; color: #666; font-weight: bold; margin-bottom: 2px; }
         #wind-data { font-size: 14px; color: #333; line-height: 1.4; }
         .controls { position: absolute; bottom: 30px; right: 20px; z-index: 1000; }
-        .btn { width: 55px; height: 55px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); cursor: pointer; transition: background 0.3s; }
+        .btn { width: 55px; height: 55px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); cursor: pointer; }
         .btn.active { background: #007AFF; color: white; }
     </style>
 </head>
 <body>
-
     <div class="search-container">
         <input type="text" id="search-input" placeholder="場所を検索...">
         <button id="search-button">🔍</button>
     </div>
-
     <div id="map"></div>
-
     <div id="wind-info">
         <div class="wind-title">風況: <span id="location-name">読み込み中</span></div>
         <div id="wind-data">取得中...</div>
     </div>
-
     <div class="controls">
         <div id="follow-btn" class="btn">🎯</div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <script>
-        // --- 地図の初期化 ---
+        // 1. 地図の初期化（八幡市をデフォルトに）
         const map = L.map('map', { center: [34.882, 135.698], zoom: 16, zoomControl: false });
 
-        // --- 波線表示（OSM標準スタイル）に変更 ---
-        // これが最も表示が安定し、意図せず地図が消えるリスクが低い設定です。
+        // 2. 最も安定した標準タイルを使用（https接続を徹底）
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '© OpenStreetMap contributors'
@@ -53,12 +47,15 @@
         let userMarker, isFollowing = false;
         let currentLat = 34.882, currentLon = 135.698;
 
-        // --- 風データ取得ロジック ---
+        // 地図の描画崩れを防止
+        setTimeout(() => { map.invalidateSize(); }, 500);
+
+        // 3. 風データ取得（Open-Meteoを使用）
         async function fetchWindData(lat, lon, label = "指定地点") {
             try {
                 document.getElementById('location-name').innerText = label;
-                const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&timezone=Asia%2FTokyo`);
-                const data = await response.json();
+                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&timezone=Asia%2FTokyo`);
+                const data = await res.json();
                 const speed = data.current.wind_speed_10m;
                 const deg = data.current.wind_direction_10m;
                 const arrows = ['↓北', '↙北東', '←東', '↖南東', '↑南', '↗南西', '→西', '↘北西'];
@@ -69,22 +66,18 @@
             }
         }
 
-        // --- 位置情報ハンドリング ---
+        // 4. 位置情報
         map.on('locationfound', (e) => {
-            currentLat = e.latlng.lat;
-            currentLon = e.latlng.lng;
+            currentLat = e.latlng.lat; currentLon = e.latlng.lng;
             if (!userMarker) {
                 userMarker = L.circleMarker(e.latlng, { radius: 9, color: '#FFFFFF', weight: 3, fillOpacity: 1, fillColor: '#007AFF' }).addTo(map);
                 fetchWindData(currentLat, currentLon, "現在地");
-            } else {
-                userMarker.setLatLng(e.latlng);
-            }
+            } else { userMarker.setLatLng(e.latlng); }
             if (isFollowing) map.setView(e.latlng, 17);
         });
-
         map.locate({ watch: true, enableHighAccuracy: true });
 
-        // --- 追従ボタン動作 ---
+        // 5. ボタン操作
         const followBtn = document.getElementById('follow-btn');
         followBtn.onclick = () => {
             isFollowing = !isFollowing;
@@ -92,34 +85,23 @@
             if (isFollowing && userMarker) map.setView(userMarker.getLatLng(), 17);
         };
 
-        // --- 検索機能 ---
+        // 6. 検索機能
         window.handleSearchResponse = function(data) {
             if (data && data.length > 0) {
-                const lat = parseFloat(data[0].lat);
-                const lon = parseFloat(data[0].lon);
+                const lat = parseFloat(data[0].lat), lon = parseFloat(data[0].lon);
                 map.setView([lat, lon], 15);
                 L.marker([lat, lon]).addTo(map).bindPopup(data[0].display_name).openPopup();
                 fetchWindData(lat, lon, "検索地点");
             }
         };
-
         document.getElementById('search-button').onclick = function() {
             const query = document.getElementById('search-input').value.trim();
-            if (!query) return;
             const script = document.createElement('script');
             script.src = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&json_callback=handleSearchResponse`;
             document.body.appendChild(script);
         };
 
-        // 起動時処理
         fetchWindData(currentLat, currentLon, "八幡市");
-        setTimeout(() => { map.invalidateSize(); }, 500);
-
-        // 10分ごとの自動更新
-        setInterval(() => {
-            const label = isFollowing ? "現在地" : document.getElementById('location-name').innerText;
-            fetchWindData(currentLat, currentLon, label);
-        }, 600000);
     </script>
 </body>
 </html>
