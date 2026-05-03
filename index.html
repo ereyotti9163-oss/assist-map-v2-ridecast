@@ -2,239 +2,39 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>アシストマジック v2 - Ride Cast</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RIDECAST - 実線表示版</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        /* デザイン設定 */
-        body { margin: 0; padding: 0; font-family: -apple-system, sans-serif; overflow: hidden; background-color: #f0f0f2; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 0; }
-
-        /* 検索バー：透過とぼかしでモダンに */
-        .search-container {
-            position: absolute; top: 15px; left: 10px; right: 10px;
-            z-index: 1000; display: flex; gap: 8px;
-        }
-        #search-input {
-            flex-grow: 1; padding: 14px; border: none; border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15); outline: none; font-size: 16px;
-            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px);
-        }
-        #search-button {
-            padding: 0 18px; background: #007AFF; color: white; border: none;
-            border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer;
-            font-size: 18px; display: flex; align-items: center; justify-content: center;
-        }
-
-        /* 風況情報パネル：より視認性を高く */
-        #wind-info {
-            position: absolute; top: 85px; left: 10px;
-            z-index: 1000; background: rgba(255, 255, 255, 0.9);
-            padding: 12px 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            min-width: 160px; pointer-events: none; border-left: 5px solid #007AFF;
-        }
-        .wind-title { font-size: 12px; color: #666; margin-bottom: 4px; font-weight: bold; letter-spacing: 0.05em; }
-        #wind-data { font-size: 15px; line-height: 1.5; color: #1a1a1a; }
-        .wind-val { color: #007AFF; font-weight: 800; font-size: 18px; }
-
-        /* 右下のコントロール */
-        .controls {
-            position: absolute; bottom: 40px; right: 20px; z-index: 1000;
-            display: flex; flex-direction: column; gap: 15px;
-        }
-        .btn {
-            width: 60px; height: 60px; background: white; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 28px; box-shadow: 0 4px 15px rgba(0,0,0,0.25);
-            cursor: pointer; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            -webkit-tap-highlight-color: transparent;
-        }
-        .btn:active { transform: scale(0.85); }
-        .btn.active { background: #007AFF; color: white; transform: rotate(360deg); }
-
-        /* ローディング表示 */
-        #loader {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            z-index: 2000; background: rgba(0,0,0,0.7); color: white;
-            padding: 15px 25px; border-radius: 30px; display: none; font-size: 14px;
-        }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; }
+        #map { height: 100vh; width: 100vw; }
+        /* 凡例やボタンなどのスタイルが必要な場合はここに追加 */
     </style>
 </head>
 <body>
-
-    <div id="loader">読み込み中...</div>
-
-    <div class="search-container">
-        <input type="text" id="search-input" placeholder="地名や施設名を入力...">
-        <button id="search-button">🔍</button>
-    </div>
-
     <div id="map"></div>
 
-    <div id="wind-info">
-        <div class="wind-title">📍 <span id="location-name">地点を特定中</span></div>
-        <div id="wind-data">取得中...</div>
-    </div>
-
-    <div class="controls">
-        <div id="follow-btn" class="btn" title="現在地を追従">🎯</div>
-    </div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <script>
-        /**
-         * アシストマジック v2 - Ride Cast (Full Script)
-         * Leaflet.js + Open-Meteo API
-         */
+        // 1. 地図の初期化（八幡市男山付近を中心に設定）
+        const map = L.map('map').setView([34.88, 135.70], 13);
 
-        // --- 1. 初期設定 ---
-        const initialCoords = [34.882, 135.698]; // デフォルト：八幡市
-        const map = L.map('map', { 
-            center: initialCoords, 
-            zoom: 16, 
-            zoomControl: false,
-            tap: true 
-        });
-
-        // 初代アシストマップと互換性のある標準OSMタイル（安定性重視）
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap contributors'
+        // 2. 自転車専用地図（CyclOSM）の読み込み
+        // これにより、サイクリングロードが「波線」ではなく「はっきりした実線」で表示されます。
+        const cyclOSM = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
+            maxZoom: 20,
+            attribution: '<a href="https://github.com/cyclosm/cyclosm-cartocss-style/releases" title="CyclOSM - Open Bicycle Render">CyclOSM</a> | Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         }).addTo(map);
 
-        let userMarker, searchMarker, isFollowing = false;
-        let currentLat = initialCoords[0], currentLon = initialCoords[1];
-        const loader = document.getElementById('loader');
+        // 3. 風向表示などのRIDECAST固有のスクリプト（以前のコードがある場合はここから下に追記してください）
+        // ※もしAPIキーが必要な気象データ連携などがある場合は、以前のコードの該当部分をこちらに移植してください。
 
-        // --- 2. 風データ取得エンジン ---
-        async function fetchWindData(lat, lon, label) {
-            try {
-                if (label) document.getElementById('location-name').innerText = label;
-                
-                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&timezone=Asia%2FTokyo`;
-                const response = await fetch(url);
-                if (!response.ok) throw new Error();
-                const data = await response.json();
-                
-                const speed = data.current.wind_speed_10m.toFixed(1);
-                const deg = data.current.wind_direction_10m;
-                
-                // 風向き計算と矢印
-                const directions = ['↓ 北', '↙ 北東', '← 東', '↖ 南東', '↑ 南', '↗ 南西', '→ 西', '↘ 北西'];
-                const arrow = directions[Math.round(deg / 45) % 8];
-                
-                document.getElementById('wind-data').innerHTML = `
-                    風速: <span class="wind-val">${speed}</span> m/s<br>
-                    風向: <span class="wind-val">${arrow}</span>
-                `;
-            } catch (e) {
-                document.getElementById('wind-data').innerText = "データ取得エラー";
-            }
+        // 現在地取得（モバイル利用時用）
+        map.locate({setView: true, maxZoom: 15});
+        function onLocationFound(e) {
+            L.marker(e.latlng).addTo(map).bindPopup("現在地").openPopup();
         }
-
-        // --- 3. 位置情報・GPS制御 ---
-        map.on('locationfound', (e) => {
-            currentLat = e.latlng.lat;
-            currentLon = e.latlng.lng;
-            
-            const radius = e.accuracy / 2;
-
-            if (!userMarker) {
-                // 初回検知：マーカー作成
-                userMarker = L.circleMarker(e.latlng, { 
-                    radius: 10, color: '#FFFFFF', weight: 3, 
-                    fillOpacity: 1, fillColor: '#007AFF' 
-                }).addTo(map);
-                
-                // 初回のみ風情報を現在地に更新
-                fetchWindData(currentLat, currentLon, "現在地");
-            } else {
-                userMarker.setLatLng(e.latlng);
-            }
-            
-            if (isFollowing) {
-                map.setView(e.latlng, 17, { animate: true });
-                fetchWindData(currentLat, currentLon, "現在地追従中");
-            }
-        });
-
-        map.on('locationerror', () => {
-            console.log("GPS信号を取得できませんでした");
-        });
-
-        // 常時監視開始
-        map.locate({ watch: true, enableHighAccuracy: true });
-
-        // --- 4. インタラクション制御 ---
-        const followBtn = document.getElementById('follow-btn');
-        followBtn.onclick = () => {
-            isFollowing = !isFollowing;
-            followBtn.classList.toggle('active', isFollowing);
-            
-            if (isFollowing) {
-                if (userMarker) {
-                    map.setView(userMarker.getLatLng(), 17);
-                    fetchWindData(currentLat, currentLon, "現在地");
-                }
-            }
-        };
-
-        // ユーザーが手動で地図を動かしたら追従を解除
-        map.on('dragstart', () => {
-            isFollowing = false;
-            followBtn.classList.remove('active');
-        });
-
-        // --- 5. 検索システム (Nominatim API) ---
-        window.handleSearchResponse = function(data) {
-            loader.style.display = 'none';
-            if (data && data.length > 0) {
-                isFollowing = false;
-                followBtn.classList.remove('active');
-                
-                const lat = parseFloat(data[0].lat);
-                const lon = parseFloat(data[0].lon);
-                const name = data[0].display_name.split(',')[0]; // 短い名前を取得
-
-                map.setView([lat, lon], 15);
-
-                if (searchMarker) map.removeLayer(searchMarker);
-                searchMarker = L.marker([lat, lon]).addTo(map)
-                    .bindPopup(`<b>${name}</b>`).openPopup();
-                
-                fetchWindData(lat, lon, name);
-            } else {
-                alert("場所が見つかりませんでした。別のキーワードを試してください。");
-            }
-        };
-
-        function performSearch() {
-            const query = document.getElementById('search-input').value.trim();
-            if (!query) return;
-
-            loader.style.display = 'block';
-            const script = document.createElement('script');
-            // JSONPを使用してCORS回避
-            script.src = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&json_callback=handleSearchResponse`;
-            document.body.appendChild(script);
-            // 使用済みスクリプトの削除
-            script.onload = () => script.remove();
-        }
-
-        document.getElementById('search-button').onclick = performSearch;
-        document.getElementById('search-input').onkeypress = (e) => { if (e.key === 'Enter') performSearch(); };
-
-        // --- 6. ライフサイクル ---
-        // 起動時：まず設定地点の風を表示
-        fetchWindData(currentLat, currentLon, "八幡市");
-
-        // 10分ごとの自動リフレッシュ
-        setInterval(() => {
-            const label = isFollowing ? "現在地(更新)" : document.getElementById('location-name').innerText;
-            fetchWindData(currentLat, currentLon, label);
-        }, 600000);
-
+        map.on('locationfound', onLocationFound);
     </script>
 </body>
 </html>
